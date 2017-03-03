@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <style type="text/css">
+         * {
+             margin: 0px;
+             padding: 0px;
+             box-sizing: border-box;
+         }
+         body {
+             overflow: hidden;
+             background: #000000;
+             cursor: none;
+         }
+         canvas {
+             position: absolute;
+             top: 0;
+             left: 0;
+             bottom: 0;
+             right: 0;
+         }
+        </style>
+    </head>
+    <body>
+        <canvas id="_canvas"></canvas>
+        <canvas id="hiddenCanvas" style="display:none"></canvas>
+        <script type="text/javascript">
+         cnv = document.getElementById('_canvas');
+         cnv.width = window.innerWidth;
+         cnv.height = window.innerHeight;
+         ct = cnv.getContext('2d');
+         w = Math.ceil(cnv.width / 10), h = Math.ceil(cnv.height / 10);
+
+         var imagesrc = ["snek.jpg", "spider.jpg", "airport.jpg"];
+
+         var img = new Image;
+         img.src = 'images/' + imagesrc[Math.floor((Math.random() * imagesrc.length))];
+         var canvas = document.getElementById('hiddenCanvas');
+         canvas.width = cnv.width;
+         canvas.height = cnv.height;
+         var imgCt = canvas.getContext('2d');
+         img.onload = function(){
+	     imgCt.drawImage(img,0,0,cnv.width,cnv.height);
+         };
+
+         var grayShadow = false;
+         var colorSamplingMethod = 'mean';
+
+         function getImageColorData(x, y) {
+	     switch (colorSamplingMethod) {
+		 case 'mean':
+                     var imgData = imgCt.getImageData(x * 10, y * 10, 10, 10);
+		     var data = imgData.data;
+		     var r = 0;
+		     var g = 0;
+		     var b = 0;
+                     var n = 0;
+		     for (var i = 0; i < 400; i += 4) {
+			 var lr = data[i];
+			 var lg = data[i + 1];
+			 var lb = data[i + 2];
+                         var la = data[i + 3];
+                         if (lr+lg+lb+la == 0) {
+                             continue;
+                         }
+                         r += lr;
+                         g += lg;
+                         b += lb;
+                         n++;
+		     }
+		     r = Math.floor(r / n);
+		     g = Math.floor(g / n);
+		     b = Math.floor(b / n);
+		     return [r,g,b];
+		 default: // sample
+		     return imgCt.getImageData(x * 10,y * 10,1,1).data;
+	     }
+         }
+         function getDarkImageColorData(x, y) {
+	     if (grayShadow) {
+		 return [68,68,68];
+	     }
+	     var data = imgCt.getImageData(x * 10,y * 10,1,1).data;
+	     var darkFactor = 3;
+	     data[0] /= darkFactor;
+	     data[1] /= darkFactor;
+	     data[2] /= darkFactor;
+	     return data;
+         }
+         function getColor(x, y, dark) {
+	     var data = dark ? getDarkImageColorData(x, y) : getImageColorData(x, y);
+	     return "#" +
+	 ("0" + data[0].toString(16)).slice(-2) +
+	 ("0" + data[1].toString(16)).slice(-2) +
+	 ("0" + data[2].toString(16)).slice(-2);
+         }
+         function shuffle(array) {
+             for (var i = array.length - 1; i > 0; --i) {
+                 var j = Math.floor(Math.random() * (i + 1));
+                 var temp = array[i];
+                 array[i] = array[j];
+                 array[j] = temp;
+             }
+             return array;
+         }
+         cells = [];
+         queue = [];
+         maxdepth = 0;
+         deepest = null;
+         for (var x = 0; x < w; ++x) {
+             cells[x] = [];
+             for (var y = 0; y < h; ++y) {
+                 cells[x][y] = {
+                     visited: false,
+                     rightWall: true,
+                     lowerWall: true,
+                     drawn: 0
+                 };
+             }
+         }
+         function dfs(p, d) {
+             if (d > maxdepth) {
+                 maxdepth = d;
+                 deepest = p;
+             }
+             cells[p.x][p.y].visited = true;
+             queue.push(p);
+             var neighbours = [{x: p.x-1, y: p.y}, {x: p.x+1, y: p.y}, {x: p.x, y: p.y-1}, {x: p.x, y: p.y+1}];
+             neighbours = shuffle(neighbours);
+             var n;
+             for (n of neighbours) {
+                 if (n.x < 0 || n.x >= w || n.y < 0 || n.y >= h || cells[n.x][n.y].visited) continue;
+                 if (p.x < n.x) cells[p.x][p.y].rightWall = false;
+                 if (p.x > n.x) cells[n.x][n.y].rightWall = false;
+                 if (p.y < n.y) cells[p.x][p.y].lowerWall = false;
+                 if (p.y > n.y) cells[n.x][n.y].lowerWall = false;
+                 dfs(n, d + 1);
+             }
+             queue.push(p);
+         }
+         var start = {x: Math.floor(Math.random() * w), y: Math.floor(Math.random() * h)};
+         dfs(start, 0);
+         var iid = setInterval(function() {
+             var c = queue.shift();
+             var color = cells[c.x][c.y].drawn == 1 ? getColor(c.x, c.y, false) : getColor(c.x, c.y, true);
+             cells[c.x][c.y].drawn++;
+             //if (c == start) {
+             //    ct.fillStyle = '#00ff00';
+             //} else {
+                 ct.fillStyle = color;
+             //}
+             ct.fillRect(c.x * 10 + 1, c.y * 10 + 1, 9, 9);
+             ct.fillStyle = color;
+             if (!cells[c.x][c.y].rightWall && cells[c.x + 1][c.y].drawn) {
+                 ct.fillRect(c.x * 10 + 10, c.y * 10 + 1, 1, 9);
+             }
+             if (!cells[c.x][c.y].lowerWall && cells[c.x][c.y + 1].drawn) {
+                 ct.fillRect(c.x * 10 + 1, c.y * 10 + 10, 9, 1);
+             }
+             if (c.x > 0 && cells[c.x - 1][c.y].drawn && !cells[c.x - 1][c.y].rightWall) {
+                 ct.fillRect((c.x - 1) * 10 + 10, c.y * 10 + 1, 1, 9);
+             }
+             if (c.y > 0 && cells[c.x][c.y - 1].drawn && !cells[c.x][c.y - 1].lowerWall) {
+                 ct.fillRect(c.x * 10 + 1, (c.y - 1) * 10 + 10, 9, 1);
+             }
+             //Restart after 30 seconds
+             if (queue.length == 0) {
+                 //ct.fillStyle = '#ff0000';
+                 //ct.fillRect(deepest.x * 10 + 1, deepest.y * 10 + 1, 9, 9);
+                 clearInterval(iid);
+                 setTimeout(function() {
+                     location.reload();
+                 }, 30000);
+             }
+         }, 20);
+        </script>    
+    </body>
+</html>
