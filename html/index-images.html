@@ -26,11 +26,20 @@
         <canvas id="_canvas"></canvas>
         <canvas id="hiddenCanvas" style="display:none"></canvas>
         <script type="text/javascript">
+		 // Settings
+		 var grayShadow = false;
+		 var colorSamplingMethod = 'mean';
+		 var dfsDelay = 20;
+		 var bfsDelay = 20;
+		 var bfsStartNumber = 10;
+		 var finishedDelay = 30000;
+		 var cellSize = 10;
+			
          cnv = document.getElementById('_canvas');
          cnv.width = window.innerWidth;
          cnv.height = window.innerHeight;
          ct = cnv.getContext('2d');
-         w = Math.ceil(cnv.width / 10), h = Math.ceil(cnv.height / 10);
+         w = Math.ceil(cnv.width / cellSize), h = Math.ceil(cnv.height / cellSize);
 
          var imagesrc = ["spider.jpg"];
 
@@ -44,19 +53,17 @@
 	     imgCt.drawImage(img,0,0,cnv.width,cnv.height);
          };
 
-         var grayShadow = false;
-         var colorSamplingMethod = 'mean';
-
+         // Color related functions
          function getImageColorData(x, y) {
 	     switch (colorSamplingMethod) {
 		 case 'mean':
-                     var imgData = imgCt.getImageData(x * 10, y * 10, 10, 10);
+                     var imgData = imgCt.getImageData(x * cellSize, y * cellSize, cellSize, cellSize);
 		     var data = imgData.data;
 		     var r = 0;
 		     var g = 0;
 		     var b = 0;
                      var n = 0;
-		     for (var i = 0; i < 400; i += 4) {
+		     for (var i = 0; i < 4 * cellSize * cellSize; i += 4) {
 			 var lr = data[i];
 			 var lg = data[i + 1];
 			 var lb = data[i + 2];
@@ -74,18 +81,18 @@
 		     b = Math.floor(b / n);
 		     return [r,g,b];
 		 default: // sample
-		     return imgCt.getImageData(x * 10,y * 10,1,1).data;
+		     return imgCt.getImageData(x * cellSize,y * cellSize,1,1).data;
 	     }
          }
          function getDarkImageColorData(x, y) {
 	     if (grayShadow) {
 		 return [68,68,68];
 	     }
-	     var data = imgCt.getImageData(x * 10,y * 10,1,1).data;
+		 var data = getImageColorData(x, y);
 	     var darkFactor = 3;
-	     data[0] /= darkFactor;
-	     data[1] /= darkFactor;
-	     data[2] /= darkFactor;
+	     data[0] = Math.floor(data[0] / darkFactor);
+	     data[1] = Math.floor(data[1] / darkFactor);
+	     data[2] = Math.floor(data[2] / darkFactor);
 	     return data;
          }
          function getColor(x, y, dark) {
@@ -95,6 +102,71 @@
 	 ("0" + data[1].toString(16)).slice(-2) +
 	 ("0" + data[2].toString(16)).slice(-2);
          }
+        
+         // BFS related functions
+         var bfs_queue = [];
+         var bfs_cells = [];
+		 for (var x = 0; x < w; ++x) {
+			 bfs_cells[x] = [];
+			 for (var y = 0; y < h; ++y) {
+				 bfs_cells[x][y] = {
+					 visited: false
+				 };
+			 }
+		 }
+         function drawBFS(p, edge) {
+             var color = edge ? getColor(p.x, p.y, true) : '#000000';
+			 ct.fillStyle = color;
+             ct.fillRect(p.x * cellSize, p.y * cellSize, cellSize, cellSize);
+         }
+         function bfs() {
+             var next_bfs_queue = [];
+             while (bfs_queue.length > 0) {
+                 var p = bfs_queue.shift();
+                 if (p.x >= 0 && p.y >=0 && p.x < w && p.y < h && !bfs_cells[p.x][p.y].visited) {
+                     drawBFS(p, false);
+                     bfs_cells[p.x][p.y].visited = true;
+                     var neighbours = [{x: p.x-1, y: p.y}, {x: p.x+1, y: p.y}, {x: p.x, y: p.y-1}, {x: p.x, y: p.y+1}];
+					 var c = neighbours[0];
+					 if (c.x >= 0 && c.y >=0 && c.x < w && c.y < h && !bfs_cells[c.x][c.y].visited && !cells[c.x][c.y].rightWall) {
+						 drawBFS(c, true);
+						 next_bfs_queue.push(c);
+					 }
+					 c = neighbours[1];
+					 if (c.x >= 0 && c.y >=0 && c.x < w && c.y < h && !bfs_cells[c.x][c.y].visited && !cells[p.x][p.y].rightWall) {
+						 drawBFS(c, true);
+						 next_bfs_queue.push(c);
+					 }
+					 c = neighbours[2];
+					 if (c.x >= 0 && c.y >=0 && c.x < w && c.y < h && !bfs_cells[c.x][c.y].visited && !cells[c.x][c.y].lowerWall) {
+						 drawBFS(c, true);
+						 next_bfs_queue.push(c);
+					 }
+					 c = neighbours[3];
+					 if (c.x >= 0 && c.y >=0 && c.x < w && c.y < h && !bfs_cells[c.x][c.y].visited && !cells[p.x][p.y].lowerWall) {
+						 drawBFS(c, true);
+						 next_bfs_queue.push(c);
+					 }
+                 }
+             }
+             bfs_queue = next_bfs_queue;
+         }
+        function startBFS() {
+			for (var i = 0; i < bfsStartNumber; i++) {
+				var bfs_start = {x: Math.floor(Math.random() * w), y: Math.floor(Math.random() * h)};
+				drawBFS(bfs_start, true);
+				bfs_queue.push(bfs_start);
+			}
+            var bfs_iid = setInterval(function() {
+			   bfs();
+               if (bfs_queue.length == 0) {
+                   clearInterval(bfs_iid);
+				   location.reload();
+               }
+           }, bfsDelay);
+        }
+        
+         // DFS related functions
          function shuffle(array) {
              for (var i = array.length - 1; i > 0; --i) {
                  var j = Math.floor(Math.random() * (i + 1));
@@ -150,19 +222,19 @@
              //} else {
                  ct.fillStyle = color;
              //}
-             ct.fillRect(c.x * 10 + 1, c.y * 10 + 1, 9, 9);
+             ct.fillRect(c.x * cellSize + 1, c.y * cellSize + 1, cellSize - 1, cellSize - 1);
              ct.fillStyle = color;
              if (!cells[c.x][c.y].rightWall && cells[c.x + 1][c.y].drawn) {
-                 ct.fillRect(c.x * 10 + 10, c.y * 10 + 1, 1, 9);
+                 ct.fillRect(c.x * cellSize + cellSize, c.y * cellSize + 1, 1, cellSize - 1);
              }
              if (!cells[c.x][c.y].lowerWall && cells[c.x][c.y + 1].drawn) {
-                 ct.fillRect(c.x * 10 + 1, c.y * 10 + 10, 9, 1);
+                 ct.fillRect(c.x * cellSize + 1, c.y * cellSize + cellSize, cellSize - 1, 1);
              }
              if (c.x > 0 && cells[c.x - 1][c.y].drawn && !cells[c.x - 1][c.y].rightWall) {
-                 ct.fillRect((c.x - 1) * 10 + 10, c.y * 10 + 1, 1, 9);
+                 ct.fillRect((c.x - 1) * cellSize + cellSize, c.y * cellSize + 1, 1, cellSize - 1);
              }
              if (c.y > 0 && cells[c.x][c.y - 1].drawn && !cells[c.x][c.y - 1].lowerWall) {
-                 ct.fillRect(c.x * 10 + 1, (c.y - 1) * 10 + 10, 9, 1);
+                 ct.fillRect(c.x * cellSize + 1, (c.y - 1) * cellSize + cellSize, cellSize - 1, 1);
              }
              //Restart after 30 seconds
              if (queue.length == 0) {
@@ -170,10 +242,10 @@
                  //ct.fillRect(deepest.x * 10 + 1, deepest.y * 10 + 1, 9, 9);
                  clearInterval(iid);
                  setTimeout(function() {
-                     location.reload();
-                 }, 30000);
+					startBFS();
+                 }, finishedDelay);
              }
-         }, 20);
+         }, dfsDelay);
         </script>    
     </body>
 </html>
