@@ -50,7 +50,21 @@
          canvas.height = cnv.height;
          var imgCt = canvas.getContext('2d');
          img.onload = function(){
-	     imgCt.drawImage(img,0,0,cnv.width,cnv.height);
+             var ratio = img.width / img.height;
+             var xi = 0;
+             var yi = 0;
+             var xf = cnv.width;
+             var yf = cnv.height;
+             if (ratio > 16/9) {
+                 var delta = Math.floor((ratio * cnv.height) - cnv.width);
+                 xi = -delta / 2;
+                 xf = cnv.width + delta;
+             } else {
+                 var delta = Math.floor((cnv.width / ratio) - cnv.height);
+                 yi = -delta / 2;
+                 yf = cnv.height + delta;
+             }
+             imgCt.drawImage(img,xi,yi,xf,yf);
          };
 
          // Color related functions
