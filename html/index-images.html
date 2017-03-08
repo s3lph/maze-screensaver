@@ -34,6 +34,7 @@
 		 var bfsStartNumber = 10;
 		 var finishedDelay = 30000;
 		 var cellSize = 10;
+                 var preserveAspectRatio = true;
 			
          cnv = document.getElementById('_canvas');
          cnv.width = window.innerWidth;
@@ -55,14 +56,16 @@
              var yi = 0;
              var xf = cnv.width;
              var yf = cnv.height;
-             if (ratio > 16/9) {
-                 var delta = Math.floor((ratio * cnv.height) - cnv.width);
-                 xi = -delta / 2;
-                 xf = cnv.width + delta;
-             } else {
-                 var delta = Math.floor((cnv.width / ratio) - cnv.height);
-                 yi = -delta / 2;
-                 yf = cnv.height + delta;
+             if (preserveAspectRatio) {
+                 if (ratio > 16/9) {
+                     var delta = Math.floor((ratio * cnv.height) - cnv.width);
+                     xi = -delta / 2;
+                     xf = cnv.width + delta;
+                 } else {
+                     var delta = Math.floor((cnv.width / ratio) - cnv.height);
+                     yi = -delta / 2;
+                     yf = cnv.height + delta;
+                 }
              }
              imgCt.drawImage(img,xi,yi,xf,yf);
          };
