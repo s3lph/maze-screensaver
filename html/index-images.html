@@ -57,7 +57,7 @@
              var xf = cnv.width;
              var yf = cnv.height;
              if (preserveAspectRatio) {
-                 if (ratio > 16/9) {
+                 if (ratio > cnv.width / cnv.height) {
                      var delta = Math.floor((ratio * cnv.height) - cnv.width);
                      xi = -delta / 2;
                      xf = cnv.width + delta;
